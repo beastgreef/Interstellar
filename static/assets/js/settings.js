@@ -110,7 +110,6 @@ function saveEventKey() {
   // biome-ignore lint/correctness/noSelfAssign:
   window.location = window.location;
 }
-// Tab Cloaker
 const dropdown = document.getElementById("dropdown");
 const options = dropdown.getElementsByTagName("option");
 
@@ -163,16 +162,23 @@ function ResetCustomCloak() {
 function redirectToMainDomain() {
   const currentUrl = window.location.href;
   const mainDomainUrl = currentUrl.replace(/\/[^\/]*$/, "");
+  const target = mainDomainUrl + window.location.pathname;
   if (window !== top) {
-    top.location.href = mainDomainUrl + window.location.pathname;
-  } else {
-    window.location.href = mainDomainUrl + window.location.pathname;
-  }
+    try {
+      top.location.href = target
+    } catch {
+      try {
+        parent.location.href = target
+      } catch {
+        window.location.href = target
+      }
+    }
+  } else window.location.href = mainDomainUrl + window.location.pathname;
 }
 
 document.addEventListener("DOMContentLoaded", event => {
   const icon = document.getElementById("tab-favicon");
-  const name = document.getElementById("tab-title");
+  const name = document.getElementById("t");
   const selectedValue = localStorage.getItem("selectedOption") || "Default";
   document.getElementById("dropdown").value = selectedValue;
   updateHeadSection(selectedValue);
@@ -189,7 +195,7 @@ function handleDropdownChange(selectElement) {
 
 function updateHeadSection(selectedValue) {
   const icon = document.getElementById("tab-favicon");
-  const name = document.getElementById("tab-title");
+  const name = document.getElementById("t");
   const customName = localStorage.getItem("CustomName");
   const customIcon = localStorage.getItem("CustomIcon");
 
@@ -365,3 +371,71 @@ function getRandomURL() {
 function randRange(min, max) {
   return Math.floor(Math.random() * (max - min) + min);
 }
+
+function exportSaveData() {
+  function getCookies() {
+    let cookies = document.cookie.split('; ');
+    let cookieObj = {};
+    cookies.forEach(cookie => {
+      let [name, value] = cookie.split('=');
+      cookieObj[name] = value;
+    });
+    return cookieObj;
+  }
+  function getLocalStorage() {
+    let localStorageObj = {};
+    for (let key in localStorage) {
+      if (localStorage.hasOwnProperty(key)) {
+        localStorageObj[key] = localStorage.getItem(key);
+      }
+    }
+    return localStorageObj;
+  }
+  const data = {
+    cookies: getCookies(),
+    localStorage: getLocalStorage()
+  };
+  const dataStr = JSON.stringify(data, null, 2);
+  const blob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'save_data.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importSaveData() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json';
+  input.onchange = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (data.cookies) {
+          Object.entries(data.cookies).forEach(([key, value]) => {
+            document.cookie = `${key}=${value}; path=/`;
+          });
+        }
+        if (data.localStorage) {
+          Object.entries(data.localStorage).forEach(([key, value]) => {
+            localStorage.setItem(key, value);
+          });
+        }
+        alert('Your save data has been imported. Please test it out.')
+        alert('If you find any issues then report it in GitHub or the Interstellar Discord.')
+      } catch (error) {
+        console.error('Error parsing JSON file:', error);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
